@@ -2,6 +2,7 @@ import { validatePassword, validateEmail, hashPassword, verifyPassword, randomSa
 import { createSession, destroySession, clearCookie, getSession } from "../auth/session.js";
 import { checkRateLimit } from "../auth/rate-limit.js";
 import { logAuth } from "../auth/audit.js";
+import { sendVerifyEmail } from "../auth/email.js";
 
 function ip(request) { return request.headers.get("CF-Connecting-IP") || "unknown"; }
 function ua(request) { return request.headers.get("User-Agent") || "unknown"; }
@@ -41,12 +42,15 @@ export async function handleSignup(request, env) {
 
   await logAuth(env, "signup", { userId, tenantId, ip: ip(request), ua: ua(request) });
 
-  // DEV: return token directly (production: send email)
+  const origin = new URL(request.url).origin;
+  const verifyUrl = origin + "/verify?token=" + verifyToken;
+  const mail = await sendVerifyEmail(env, { to: email.toLowerCase(), factoryName: factory_name, verifyUrl });
+  await logAuth(env, "verify_email_sent", { userId, tenantId, ip: ip(request), ua: ua(request), meta: { ok: mail.ok } });
+
   return Response.json({
     ok: true,
-    message: "Account created. Verify email to continue.",
-    verify_url: `/verify?token=${verifyToken}`,
-    dev_token: verifyToken,
+    message: "Account created. Check your email to verify.",
+    email_sent: mail.ok,
   }, { status: 201 });
 }
 

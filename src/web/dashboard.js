@@ -52,6 +52,13 @@ tailwind.config = {
         <div class="text-2xl font-semibold" id="s-commands">—</div>
       </div>
     </div>
+    <div class="flex items-center justify-between mb-3 mt-6">
+      <div class="text-xs font-mono tracking-[0.2em] uppercase text-neutral-600">API Keys</div>
+      <button id="add-key-btn" class="text-xs px-2.5 py-1 bg-white text-black rounded-md font-medium hover:bg-neutral-200 transition">+ Key</button>
+    </div>
+    <div id="keys-list" class="space-y-2 mb-8">
+      <div class="text-xs text-neutral-600 text-center py-4">No keys</div>
+    </div>
     <div class="text-xs font-mono tracking-[0.2em] uppercase text-neutral-600 mb-3">Recent alerts</div>
     <div id="alerts-list" class="space-y-2">
       <div class="text-xs text-neutral-600 text-center py-6">No alerts</div>
@@ -97,6 +104,36 @@ tailwind.config = {
   </aside>
 
 </main>
+
+<div id="key-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="w-full max-w-md bg-ink-900 border border-white/10 rounded-xl p-6">
+    <h3 class="text-lg font-semibold mb-4">New API key</h3>
+    <form id="key-form" class="space-y-3">
+      <input name="name" placeholder="Name (e.g. Press-01 gateway)" required class="w-full px-3 py-2 bg-ink-950 border border-white/10 rounded-lg text-sm outline-none focus:border-white/30">
+      <select name="scope" class="w-full px-3 py-2 bg-ink-950 border border-white/10 rounded-lg text-sm outline-none focus:border-white/30">
+        <option value="ingest:write">ingest:write (machine can POST telemetry)</option>
+        <option value="ingest:read">ingest:read (read-only)</option>
+      </select>
+      <div id="key-msg" class="text-sm text-center"></div>
+      <div class="flex gap-2 pt-2">
+        <button type="button" id="key-cancel" class="flex-1 py-2 border border-white/10 rounded-lg text-sm hover:border-white/25 transition">Cancel</button>
+        <button type="submit" class="flex-1 py-2 bg-white text-black rounded-lg font-medium text-sm hover:bg-neutral-200 transition">Create</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="key-reveal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="w-full max-w-lg bg-ink-900 border border-white/10 rounded-xl p-6">
+    <h3 class="text-lg font-semibold mb-2">Save your API key</h3>
+    <p class="text-xs text-neutral-500 mb-4">It will not be shown again. Paste this into your edge gateway config.</p>
+    <div class="bg-ink-950 border border-white/10 rounded-lg p-3 font-mono text-xs break-all text-green-400" id="key-value"></div>
+    <div class="flex gap-2 mt-4">
+      <button id="key-copy" class="flex-1 py-2 border border-white/10 rounded-lg text-sm hover:border-white/25">Copy</button>
+      <button id="key-close" class="flex-1 py-2 bg-white text-black rounded-lg font-medium text-sm">Done</button>
+    </div>
+  </div>
+</div>
 
 <div id="machine-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
   <div class="w-full max-w-md bg-ink-900 border border-white/10 rounded-xl p-6">
@@ -305,10 +342,62 @@ tailwind.config = {
     } catch (err) { msg.innerHTML = '<span class="text-red-400">' + err.message + '</span>'; }
   });
 
+  async function loadKeys() {
+    try {
+      const r = await fetch('/api/keys', { headers: { 'X-CSRF-Token': csrf } });
+      const j = await r.json();
+      const list = $('keys-list');
+      const keys = (j.keys || []).filter(k => !k.revoked);
+      if (!keys.length) { list.innerHTML = '<div class="text-xs text-neutral-600 text-center py-4">No keys</div>'; return; }
+      list.innerHTML = keys.map(k => {
+        const d = new Date((k.created_at || 0) * 1000).toISOString().slice(0, 10);
+        return '<div class="group flex items-center justify-between px-3 py-2 rounded-md bg-ink-900 border border-white/5 text-xs">' +
+          '<div><div class="font-medium text-neutral-300">' + k.name + '</div>' +
+          '<div class="text-neutral-600 font-mono">' + k.scope + ' · ' + d + '</div></div>' +
+          '<button data-revoke="' + k.id + '" class="text-neutral-600 hover:text-red-400 transition opacity-0 group-hover:opacity-100">Revoke</button>' +
+        '</div>';
+      }).join('');
+      list.querySelectorAll('[data-revoke]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.getAttribute('data-revoke');
+          if (!confirm('Revoke this key?')) return;
+          await fetch('/api/keys/' + id, { method: 'DELETE', headers: { 'X-CSRF-Token': csrf } });
+          loadKeys();
+        });
+      });
+    } catch (e) { console.error(e); }
+  }
+
+  $('add-key-btn').addEventListener('click', () => $('key-modal').classList.remove('hidden'));
+  $('key-cancel').addEventListener('click', () => $('key-modal').classList.add('hidden'));
+  $('key-close').addEventListener('click', () => $('key-reveal').classList.add('hidden'));
+  $('key-copy').addEventListener('click', () => {
+    navigator.clipboard.writeText($('key-value').textContent);
+    $('key-copy').textContent = 'Copied';
+  });
+
+  $('key-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = $('key-msg');
+    msg.textContent = '';
+    const data = Object.fromEntries(new FormData(e.target));
+    try {
+      const r = await fetch('/api/keys', { method: 'POST', headers: authHeaders(), body: JSON.stringify(data) });
+      const j = await r.json();
+      if (!r.ok) { msg.innerHTML = '<span class="text-red-400">' + (j.error || 'Failed') + '</span>'; return; }
+      $('key-modal').classList.add('hidden');
+      e.target.reset();
+      $('key-value').textContent = j.key.key;
+      $('key-reveal').classList.remove('hidden');
+      loadKeys();
+    } catch (err) { msg.innerHTML = '<span class="text-red-400">' + err.message + '</span>'; }
+  });
+
   (async () => {
     const me = await loadMe();
     if (!me) return;
     await loadMachines();
+    await loadKeys();
     await loadDashboard();
     setInterval(loadDashboard, 15000);
   })();

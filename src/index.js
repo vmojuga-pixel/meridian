@@ -7,6 +7,7 @@ import { handleMeriChat } from "./meri/chat.js";
 import { handleKillSwitch } from "./guardrail/kill-switch.js";
 import { handleSignup, handleLogin, handleLogout, handleVerify, handleMe } from "./api/auth.js";
 import { handleMachinesList, handleMachineCreate, handleMachineDelete } from "./api/machines.js";
+import { handleApiKeyList, handleApiKeyCreate, handleApiKeyRevoke, verifyApiKey } from "./api/apikeys.js";
 import { requireAuth, requireCSRF, securityHeaders } from "./auth/middleware.js";
 import { LANDING_HTML } from "./web/landing.js";
 import { DASHBOARD_HTML } from "./web/dashboard.js";
@@ -45,6 +46,14 @@ export default {
     if (path === "/api/auth/logout" && request.method === "POST") return handleLogout(request, env);
     if (path === "/api/auth/verify" && request.method === "GET") return handleVerify(request, env);
 
+    // --- Machine ingest via API key (no session) ---
+    if (path.startsWith("/api/ingest")) {
+      const apiKey = request.headers.get("X-API-Key");
+      const keyInfo = await verifyApiKey(env, apiKey, "ingest:write");
+      if (!keyInfo) return Response.json({ error: "Invalid API key" }, { status: 401 });
+      return await handleIngest(request, env, keyInfo.tenantId);
+    }
+
     // --- Auth required below ---
     const auth = await requireAuth(env, request);
     if (auth.error) return securityHeaders(auth.error);
@@ -69,6 +78,17 @@ export default {
     if (path.startsWith("/api/machines/") && request.method === "DELETE") {
       const id = path.slice("/api/machines/".length);
       return securityHeaders(await handleMachineDelete(request, env, session, id));
+    }
+
+    if (path === "/api/keys" && request.method === "GET") {
+      return securityHeaders(await handleApiKeyList(request, env, session));
+    }
+    if (path === "/api/keys" && request.method === "POST") {
+      return securityHeaders(await handleApiKeyCreate(request, env, session));
+    }
+    if (path.startsWith("/api/keys/") && request.method === "DELETE") {
+      const id = path.slice("/api/keys/".length);
+      return securityHeaders(await handleApiKeyRevoke(request, env, session, id));
     }
 
     if (path === "/api/kill") return handleKillSwitch(request, env);
