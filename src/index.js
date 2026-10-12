@@ -6,6 +6,8 @@ import { handleHealth } from "./api/health.js";
 import { handleMeriChat } from "./meri/chat.js";
 import { handleKillSwitch } from "./guardrail/kill-switch.js";
 import { MERI_HTML } from "./meri/ui.js";
+import { LANDING_HTML } from "./web/landing.js";
+import { DASHBOARD_HTML } from "./web/dashboard.js";
 
 export { Tenant } from "./tenant/durable-object.js";
 
@@ -27,6 +29,8 @@ export default {
 
     // Health
     if (path === "/health") return handleHealth();
+    if (path === "/" || path === "") return new Response(LANDING_HTML, { headers: { "Content-Type": "text/html;charset=utf-8" } });
+    if (path === "/dashboard") return new Response(DASHBOARD_HTML, { headers: { "Content-Type": "text/html;charset=utf-8" } });
     if (path === "/meri") return new Response(MERI_HTML, { headers: { "Content-Type": "text/html;charset=utf-8" } });
 
     // Kill switch
