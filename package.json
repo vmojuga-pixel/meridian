@@ -1,0 +1,17 @@
+{
+  "name": "meridian-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "test": "vitest",
+    "migrate": "wrangler d1 migrations apply meridian-db"
+  },
+  "devDependencies": {
+    "vitest": "^1.0.0",
+    "wrangler": "^3.80.0"
+  }
+}
