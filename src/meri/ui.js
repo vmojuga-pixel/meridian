@@ -32,16 +32,26 @@ export const MERI_HTML = `<!DOCTYPE html>
 </header>
 <div class="tenant">Tenant: <span id="tenant"></span></div>
 <main id="chat">
-  <div class="msg meri">Hi. Saya Meri. Saya boleh ringkaskan prestasi mesin, alert, dan cadangan. Saya tak kawal mesin. Tanya apa-apa.</div>
+  <div class="msg meri">Hi. I am Meri. I can summarize machine performance, alerts, and recommendations. I never control machines. Ask me anything.</div>
 </main>
 <form id="f">
-  <input type="text" id="q" placeholder="Tanya Meri..." autocomplete="off" required>
-  <button type="submit" id="b">Hantar</button>
+  <input type="text" id="q" placeholder="Ask Meri..." autocomplete="off" required>
+  <button type="submit" id="b">Send</button>
 </form>
 <script>
-  const params = new URLSearchParams(location.search);
-  const tenant = params.get('tenant') || 'factory-001';
-  document.getElementById('tenant').textContent = tenant;
+  let tenant = null;
+  let csrf = sessionStorage.getItem('csrf') || '';
+  (async () => {
+    try {
+      const r = await fetch('/api/auth/me', { headers: { 'X-CSRF-Token': csrf } });
+      if (r.status === 401 || r.status === 403) { location.href = '/login'; return; }
+      const j = await r.json();
+      tenant = j.user.tenant_id;
+      csrf = j.csrf_token;
+      sessionStorage.setItem('csrf', csrf);
+      document.getElementById('tenant').textContent = (j.tenant && j.tenant.factory_name) || tenant;
+    } catch (e) { location.href = '/login'; }
+  })();
   const chat = document.getElementById('chat');
   const f = document.getElementById('f');
   const q = document.getElementById('q');
@@ -67,7 +77,7 @@ export const MERI_HTML = `<!DOCTYPE html>
     try {
       const r = await fetch('/api/meri/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': tenant },
+        headers: { 'Content-Type': 'application/json', 'X-Tenant-ID': tenant, 'X-CSRF-Token': csrf },
         body: JSON.stringify({ message: msg })
       });
       const j = await r.json();

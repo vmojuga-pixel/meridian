@@ -25,7 +25,7 @@ tailwind.config = {
 <body class="bg-ink-950 text-neutral-200 font-sans">
 
 <header class="fixed top-0 inset-x-0 z-50 border-b border-white/5 backdrop-blur-xl bg-ink-950/70">
-  <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
     <a href="/" class="font-mono text-sm tracking-[0.3em] uppercase text-neutral-300">Meridian</a>
     <nav class="hidden md:flex items-center gap-8 text-sm text-neutral-500">
       <a href="#product" class="hover:text-neutral-100 transition">Product</a>
@@ -39,13 +39,13 @@ tailwind.config = {
   </div>
 </header>
 
-<section class="relative pt-40 pb-32 grid-bg border-b border-white/5">
+<section class="relative pt-32 sm:pt-40 pb-20 sm:pb-32 grid-bg border-b border-white/5">
   <div class="max-w-6xl mx-auto px-6">
     <div class="inline-flex items-center gap-2 text-xs font-mono tracking-widest uppercase text-neutral-500 border border-white/10 rounded-full px-4 py-1.5 mb-8">
       <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
       Edge-native · EU AI Act ready
     </div>
-    <h1 class="text-5xl md:text-7xl font-semibold tracking-tight leading-[1.05] max-w-4xl mb-8">
+    <h1 class="text-4xl sm:text-5xl md:text-7xl font-semibold tracking-tight leading-[1.1] max-w-4xl mb-8">
       Deterministic intelligence for <span class="text-neutral-500">legacy industrial systems.</span>
     </h1>
     <p class="text-lg md:text-xl text-neutral-400 max-w-2xl leading-relaxed mb-12">
