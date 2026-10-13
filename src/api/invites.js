@@ -1,6 +1,7 @@
 import { randomHex, sha256Hex } from "../auth/password.js";
 import { logAuth } from "../auth/audit.js";
 import { sendInviteEmail } from "../auth/email.js";
+import { checkPlanLimit } from "./billing.js";
 
 function ip(request) { return request.headers.get("CF-Connecting-IP") || "unknown"; }
 function ua(request) { return request.headers.get("User-Agent") || "unknown"; }
@@ -28,6 +29,9 @@ export async function handleInviteCreate(request, env, session) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return Response.json({ error: "Invalid email" }, { status: 400 });
   }
+
+  const limit = await checkPlanLimit(env, session.tenantId, "user");
+  if (!limit.ok) return Response.json({ error: limit.error, plan: limit.plan }, { status: 402 });
 
   const existingUser = await env.DB.prepare(
     "SELECT id FROM users WHERE email = ? AND tenant_id = ?"

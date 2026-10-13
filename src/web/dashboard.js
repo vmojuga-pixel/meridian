@@ -26,6 +26,7 @@ tailwind.config = {
 <header class="border-b border-white/5 px-6 h-14 flex items-center gap-4 flex-shrink-0">
   <a href="/" class="font-mono text-xs tracking-[0.3em] uppercase text-neutral-400 hover:text-neutral-100">Meridian</a>
   <span class="font-mono text-xs text-neutral-500 border border-white/10 rounded px-2 py-1" id="tenant-label">...</span>
+  <button id="billing-btn" class="text-xs px-3 py-1.5 border border-white/10 rounded-md text-neutral-300 hover:border-white/25 transition">Plan</button>
   <button id="invites-btn" class="text-xs px-3 py-1.5 border border-white/10 rounded-md text-neutral-300 hover:border-white/25 transition">Team</button>
   <button id="2fa-btn" class="text-xs px-3 py-1.5 border border-white/10 rounded-md text-neutral-300 hover:border-white/25 transition">2FA</button>
   <button id="rules-btn" class="ml-auto text-xs px-3 py-1.5 bg-white text-black rounded-md font-medium hover:bg-neutral-200 transition">Rules</button>
@@ -123,6 +124,18 @@ tailwind.config = {
         <button type="submit" class="flex-1 py-2 bg-white text-black rounded-lg font-medium text-sm hover:bg-neutral-200 transition">Create</button>
       </div>
     </form>
+  </div>
+</div>
+
+<div id="billing-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+  <div class="w-full max-w-2xl bg-ink-900 border border-white/10 rounded-xl p-6 my-8">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold">Plan &amp; usage</h3>
+      <button id="billing-close" class="text-neutral-500 hover:text-neutral-200">Close</button>
+    </div>
+    <div id="billing-current" class="mb-6"></div>
+    <div id="billing-plans" class="grid md:grid-cols-2 gap-3"></div>
+    <div id="billing-msg" class="text-sm text-center mt-4"></div>
   </div>
 </div>
 
@@ -655,6 +668,71 @@ tailwind.config = {
       loadInvites();
     } catch (err) { msg.innerHTML = '<span class="text-red-400">' + err.message + '</span>'; }
   });
+
+  $('billing-btn').addEventListener('click', () => { $('billing-modal').classList.remove('hidden'); loadBilling(); });
+  $('billing-close').addEventListener('click', () => $('billing-modal').classList.add('hidden'));
+
+  async function loadBilling() {
+    const cur = $('billing-current');
+    const grid = $('billing-plans');
+    cur.innerHTML = '<div class="text-xs text-neutral-600 text-center py-4">Loading...</div>';
+    grid.innerHTML = '';
+    try {
+      const [curR, plansR] = await Promise.all([
+        fetch('/api/billing/current', { headers: { 'X-CSRF-Token': csrf } }),
+        fetch('/api/billing/plans', { headers: { 'X-CSRF-Token': csrf } }),
+      ]);
+      const cj = await curR.json();
+      const pj = await plansR.json();
+
+      cur.innerHTML =
+        '<div class="p-4 rounded-lg bg-ink-950 border border-white/5">' +
+          '<div class="flex items-center justify-between mb-2">' +
+            '<div class="font-semibold">' + (cj.plan && cj.plan.name || 'Free') + '</div>' +
+            '<div class="text-xs text-neutral-500">$' + (cj.plan && cj.plan.price_monthly || 0) + '/mo</div>' +
+          '</div>' +
+          '<div class="text-xs text-neutral-500 font-mono">' +
+            'machines ' + cj.usage.machines + '/' + (cj.plan && cj.plan.max_machines) +
+            ' · users ' + cj.usage.users + '/' + (cj.plan && cj.plan.max_users) +
+          '</div>' +
+        '</div>';
+
+      grid.innerHTML = (pj.plans || []).map(p2 => {
+        const active = cj.plan && cj.plan.id === p2.id;
+        const features = JSON.parse(p2.features || '[]');
+        return '<div class="p-4 rounded-lg border ' + (active ? 'border-white/30 bg-ink-950' : 'border-white/5') + '">' +
+          '<div class="flex items-center justify-between mb-2">' +
+            '<div class="font-semibold">' + p2.name + '</div>' +
+            '<div class="text-xs text-neutral-500">$' + p2.price_monthly + '/mo</div>' +
+          '</div>' +
+          '<ul class="text-xs text-neutral-500 space-y-1 mb-3">' +
+            features.map(f => '<li>· ' + f + '</li>').join('') +
+          '</ul>' +
+          '<button data-plan="' + p2.id + '" ' + (active ? 'disabled' : '') + ' class="w-full py-2 text-xs rounded-md font-medium transition ' + (active ? 'bg-white/10 text-neutral-500 cursor-not-allowed' : 'bg-white text-black hover:bg-neutral-200') + '">' + (active ? 'Current' : 'Choose') + '</button>' +
+        '</div>';
+      }).join('');
+
+      grid.querySelectorAll('[data-plan]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const planId = btn.getAttribute('data-plan');
+          const msg = $('billing-msg');
+          msg.textContent = '';
+          const r = await fetch('/api/billing/checkout', {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({ plan_id: planId }),
+          });
+          const j = await r.json();
+          if (!r.ok) { msg.innerHTML = '<span class="text-red-400">' + (j.error || 'Failed') + '</span>'; return; }
+          if (j.url) { location.href = j.url; return; }
+          msg.innerHTML = '<span class="text-green-400">' + (j.message || 'Plan selected') + '</span>';
+          loadBilling();
+        });
+      });
+    } catch (e) {
+      cur.innerHTML = '<div class="text-sm text-red-400">' + e.message + '</div>';
+    }
+  }
 
   (async () => {
     const me = await loadMe();

@@ -11,6 +11,7 @@ import { handleApiKeyList, handleApiKeyCreate, handleApiKeyRevoke, verifyApiKey 
 import { handleTenantMe } from "./api/tenants.js";
 import { handle2FASetup, handle2FAVerify, handle2FADisable, handle2FAStatus } from "./api/2fa.js";
 import { handleInviteList, handleInviteCreate, handleInviteRevoke, handleInviteAccept } from "./api/invites.js";
+import { handlePlans, handleCurrentPlan, handleSelectPlan, handleStripeCheckout, handleStripeWebhook } from "./api/billing.js";
 import { handleRulesList, handleRuleCreate, handleRuleUpdate, handleRuleDelete } from "./api/rules.js";
 import { requireAuth, requireCSRF, securityHeaders } from "./auth/middleware.js";
 import { LANDING_HTML } from "./web/landing.js";
@@ -47,6 +48,7 @@ export default {
     if (path === "/accept") return html(ACCEPT_HTML);
 
     // --- Auth API ---
+    if (path === "/api/stripe/webhook" && request.method === "POST") return handleStripeWebhook(request, env);
     if (path === "/api/auth/signup" && request.method === "POST") return handleSignup(request, env);
     if (path === "/api/auth/login" && request.method === "POST") return handleLogin(request, env);
     if (path === "/api/auth/logout" && request.method === "POST") return handleLogout(request, env);
@@ -128,6 +130,19 @@ export default {
     if (path === "/api/ws" && request.headers.get("Upgrade") === "websocket") {
       const stub = env.TENANT.get(env.TENANT.idFromName(session.tenantId));
       return stub.fetch(request);
+    }
+
+    if (path === "/api/billing/plans" && request.method === "GET") {
+      return securityHeaders(await handlePlans(request, env, session));
+    }
+    if (path === "/api/billing/current" && request.method === "GET") {
+      return securityHeaders(await handleCurrentPlan(request, env, session));
+    }
+    if (path === "/api/billing/select" && request.method === "POST") {
+      return securityHeaders(await handleSelectPlan(request, env, session));
+    }
+    if (path === "/api/billing/checkout" && request.method === "POST") {
+      return securityHeaders(await handleStripeCheckout(request, env, session));
     }
 
     if (path === "/api/invites" && request.method === "GET") {

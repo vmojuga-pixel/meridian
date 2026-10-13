@@ -1,5 +1,6 @@
 import { randomHex } from "../auth/password.js";
 import { logAuth } from "../auth/audit.js";
+import { checkPlanLimit } from "./billing.js";
 
 function ip(request) { return request.headers.get("CF-Connecting-IP") || "unknown"; }
 function ua(request) { return request.headers.get("User-Agent") || "unknown"; }
@@ -15,6 +16,9 @@ export async function handleMachineCreate(request, env, session) {
   const body = await request.json();
   const { name, brand, model, protocol, serial } = body;
   if (!name || name.length < 2) return Response.json({ error: "Machine name required" }, { status: 400 });
+
+  const limit = await checkPlanLimit(env, session.tenantId, "machine");
+  if (!limit.ok) return Response.json({ error: limit.error, plan: limit.plan }, { status: 402 });
 
   const id = "m_" + randomHex(8);
   await env.DB.prepare(
