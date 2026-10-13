@@ -57,12 +57,12 @@ export async function handlePublicMeriChat(request, env) {
     return Response.json({ error: "POST required" }, { status: 405 });
   }
 
-  // Rate limit by IP: 20 messages / hour
+  // Rate limit by IP: 10 messages / hour
   const ip = request.headers.get("CF-Connecting-IP") || "anon";
   const rlKey = "rl:meri:public:" + ip;
   const now = Math.floor(Date.now() / 1000);
   const raw = await env.KV.get(rlKey, "json");
-  if (raw && now - raw.start < 3600 && raw.count >= 20) {
+  if (raw && now - raw.start < 3600 && raw.count >= 10) {
     return Response.json({ error: "Rate limit reached. Try again later.", retry_after: 3600 - (now - raw.start) }, { status: 429 });
   }
   if (!raw || now - raw.start >= 3600) {
