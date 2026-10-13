@@ -483,13 +483,35 @@ tailwind.config = {
     } catch (err) { msg.innerHTML = '<span class="text-red-400">' + err.message + '</span>'; }
   });
 
+  let ws = null;
+  function connectWS() {
+    try {
+      const proto = location.protocol === "https:" ? "wss:" : "ws:";
+      ws = new WebSocket(proto + "//" + location.host + "/api/ws");
+      ws.onopen = () => console.log("WS open");
+      ws.onmessage = (ev) => {
+        try {
+          const msg = JSON.parse(ev.data);
+          if (msg.type === "telemetry") {
+            loadDashboard();
+            if (msg.actions && msg.actions.length) {
+              console.log("Rule fired:", msg.actions);
+            }
+          }
+        } catch {}
+      };
+      ws.onclose = () => setTimeout(connectWS, 3000);
+      ws.onerror = () => {};
+    } catch (e) { console.error(e); }
+  }
+
   (async () => {
     const me = await loadMe();
     if (!me) return;
     await loadMachines();
     await loadKeys();
     await loadDashboard();
-    setInterval(loadDashboard, 15000);
+    connectWS();
   })();
 </script>
 </body>
