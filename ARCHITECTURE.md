@@ -1,41 +1,79 @@
 # Architecture
 
+## Data Flow — Data Sovereignty by Design
+
+    [ Legacy Machines / PLCs / Sensors ]
+                │
+                ▼
+    [ Meridian Edge Gateway ]  (on-premise)
+       • Reads machine data via industrial protocols
+       • Stores RAW readings in local SQLite (30-day rolling window)
+       • Computes hourly aggregates locally
+       • Sends ONLY aggregates to cloud
+                │ HTTPS (aggregates + alerts + commands)
+                ▼
+    [ Meridian Cloud ]
+       • Receives hourly aggregates, not raw readings
+       • Stores: machines, rules, alerts, commands, aggregates
+       • Never receives raw telemetry
+
+**Guarantee:** Raw machine data never leaves the factory by default. The cloud
+sees hourly averages, min/max, sample counts, alerts, and commands — never
+individual sensor readings.
+
 ## Layers
 
-### 1. Cloudflare Edge (Meridian Core)
-- Workers: API entry, routing
-- Durable Objects: one per tenant (factory)
-- D1: SQLite per tenant
-- KV: global config, rules registry
-- R2: immutable audit logs
-- Queues: async jobs
-- Cron: nightly reports
+### 1. Edge Gateway (On-Premise)
+- Raspberry Pi 4 / Mini-PC / Industrial PC
+- Protocol adapters for industrial equipment
+- Local SQLite:
+  - `readings` — raw samples, rolling 30-day retention
+  - `queue` — offline buffer for aggregates when cloud is unreachable
+- Computes aggregates every 5 minutes
+- TLS-only egress
 
-### 2. Edge Gateway (On-Premise)
-- Raspberry Pi / Mini PC at factory
-- Reads PLC via Modbus / OPC-UA / Serial
-- Store-and-forward: works offline
+### 2. Meridian Cloud
+- Multi-tenant (one isolated environment per factory)
+- Deterministic rules engine (no black box in control loops)
+- Immutable audit log
+- Advisory AI (never controls machines)
 
-### 3. Legacy Machines
-- PLCs, SCADA, sensors -- not modified
+## Data Schema (Cloud)
 
-## Data Flow
+| Table | Purpose |
+|-------|---------|
+| `tenants` | Factory accounts |
+| `users` | Team members per tenant |
+| `sessions` | Auth sessions |
+| `api_keys` | Machine auth (scoped) |
+| `machines` | Equipment catalog |
+| `rules` | Deterministic rules |
+| `rule_templates` | Marketplace |
+| `telemetry_agg` | Hourly aggregates only |
+| `alerts` | Alert events |
+| `commands` | Outbound commands |
+| `audit_auth` | Auth events |
+| `public_kb` | Public Meri knowledge base |
 
-    Machine -> PLC -> Gateway -> Meridian Core -> Rules Engine
-                                                       |
-                                              Alert / Command
-                                                       |
-                                       Gateway -> PLC -> Machine
+## Data Schema (On-Premise Only)
+
+| Table | Purpose |
+|-------|---------|
+| `readings` | Raw sensor samples (30-day rolling) |
+| `queue` | Offline aggregate buffer |
 
 ## Multi-Tenancy
-
-Each tenant = one Durable Object.
-Isolation: separate D1, DO state, API keys, audit log.
-Sharding: if tenant exceeds DO limits, shard by machine group.
+Each tenant has isolated rules, data, users, and audit trail.
 
 ## Security
+- Password: PBKDF2-SHA256, 100k iterations, salt
+- Session: HttpOnly, Secure, SameSite=Strict cookie
+- CSRF: token on all state-changing requests
+- Rate limits: per-tenant and per-IP
+- Kill switch: global and per-tenant
+- Secrets: environment only, never in code
 
-- API keys per tenant (SHA-256 hashed)
-- Rate limits per tenant
-- Kill switch global + tenant level
-- All commands signed and logged
+## Compliance
+- EU AI Act (High-Risk Annex III): human oversight, transparency, record-keeping
+- GDPR: data minimisation, on-prem default, no PII in telemetry
+- IEC 62443: network segmentation, TLS-only egress
