@@ -91,7 +91,18 @@ f.addEventListener('submit', async (e) => {
     const j = await r.json();
     if (!r.ok) { msg.innerHTML = '<span class="text-red-400">' + (j.error || 'Login failed') + '</span>'; return; }
     sessionStorage.setItem('csrf', j.csrf_token);
-    location.href = '/dashboard';
+    // Check onboarding status
+    try {
+      const me = await fetch('/api/auth/me', { headers: { 'X-CSRF-Token': j.csrf_token } });
+      const mj = await me.json();
+      if (mj.tenant && mj.tenant.factory_name && mj.tenant.onboarded !== 0) {
+        location.href = '/dashboard';
+      } else {
+        location.href = '/onboarding';
+      }
+    } catch (e) {
+      location.href = '/dashboard';
+    }
   } catch (err) { msg.innerHTML = '<span class="text-red-400">' + err.message + '</span>'; }
   finally { btn.disabled = false; }
 });

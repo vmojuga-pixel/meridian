@@ -50,12 +50,6 @@ export async function sendVerifyEmail(env, { to, factoryName, verifyUrl }) {
   const from = env.EMAIL_FROM || "noreply@meridian.local";
   const attempts = [];
 
-  if (env.MAILTRAP_TOKEN) {
-    const a = await sendViaMailtrap(env, { to, factoryName, verifyUrl, from });
-    attempts.push(a);
-    if (a.ok) return a;
-  }
-
   if (env.BREVO_API_KEY) {
     const a = await sendViaBrevo(env, { to, factoryName, verifyUrl, from });
     attempts.push(a);

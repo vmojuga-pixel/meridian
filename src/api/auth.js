@@ -33,7 +33,7 @@ export async function handleSignup(request, env) {
   ).bind(tenantId, factory_name, "pending").run();
 
   await env.DB.prepare(
-    "UPDATE tenants SET factory_name = ?, country = ?, industry = ?, onboarded = 1 WHERE id = ?"
+    "UPDATE tenants SET factory_name = ?, country = ?, industry = ?, onboarded = 0 WHERE id = ?"
   ).bind(factory_name, country || null, industry || null, tenantId).run();
 
   await env.DB.prepare(

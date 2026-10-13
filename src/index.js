@@ -8,11 +8,13 @@ import { handleKillSwitch } from "./guardrail/kill-switch.js";
 import { handleSignup, handleLogin, handleLogout, handleVerify, handleMe } from "./api/auth.js";
 import { handleMachinesList, handleMachineCreate, handleMachineDelete } from "./api/machines.js";
 import { handleApiKeyList, handleApiKeyCreate, handleApiKeyRevoke, verifyApiKey } from "./api/apikeys.js";
+import { handleTenantMe } from "./api/tenants.js";
 import { requireAuth, requireCSRF, securityHeaders } from "./auth/middleware.js";
 import { LANDING_HTML } from "./web/landing.js";
 import { DASHBOARD_HTML } from "./web/dashboard.js";
 import { SIGNUP_HTML, LOGIN_HTML, VERIFY_HTML } from "./web/auth.js";
 import { MERI_HTML } from "./meri/ui.js";
+import { ONBOARDING_HTML } from "./web/onboarding.js";
 
 export { Tenant } from "./tenant/durable-object.js";
 
@@ -66,7 +68,13 @@ export default {
       return securityHeaders(await handleMe(request, env, session));
     }
 
-    if (path === "/dashboard") return html(DASHBOARD_HTML);
+    if (path === "/dashboard") {
+      const t = await env.DB.prepare("SELECT onboarded, factory_name FROM tenants WHERE id = ?").bind(session.tenantId).first();
+      if (!t || !t.factory_name || t.onboarded === 0) {
+        return Response.redirect(new URL("/onboarding", request.url).toString(), 302);
+      }
+      return html(DASHBOARD_HTML);
+    }
     if (path === "/meri") return html(MERI_HTML);
 
     if (path === "/api/machines" && request.method === "GET") {
@@ -89,6 +97,12 @@ export default {
     if (path.startsWith("/api/keys/") && request.method === "DELETE") {
       const id = path.slice("/api/keys/".length);
       return securityHeaders(await handleApiKeyRevoke(request, env, session, id));
+    }
+
+    if (path === "/onboarding") return html(ONBOARDING_HTML);
+
+    if (path === "/api/tenants/me") {
+      return securityHeaders(await handleTenantMe(request, env, session));
     }
 
     if (path === "/api/kill") return handleKillSwitch(request, env);
