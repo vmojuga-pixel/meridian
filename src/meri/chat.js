@@ -25,7 +25,7 @@ async function getTenantSummary(env, tenantId) {
       "SELECT COUNT(*) as n FROM commands WHERE tenant_id = ? AND ts > unixepoch() - 86400"
     ).bind(tenantId).first(),
     env.DB.prepare(
-      "SELECT COUNT(DISTINCT machine_id) as n FROM telemetry WHERE tenant_id = ?"
+      "SELECT COUNT(DISTINCT machine_id) as n FROM telemetry_agg WHERE tenant_id = ?"
     ).bind(tenantId).first(),
   ]);
 

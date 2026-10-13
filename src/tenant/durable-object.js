@@ -49,17 +49,45 @@ export class Tenant {
     // Evaluate rules (deterministic)
     const actions = this.engine.evaluate(data, ctx);
 
-    // Store telemetry
-    await this.env.DB.prepare(
-      "INSERT INTO telemetry (tenant_id, machine_id, temp, rpm, power, status) VALUES (?, ?, ?, ?, ?, ?)"
-    ).bind(
-      this.tenantId,
-      data.machine_id,
-      data.temp ?? null,
-      data.rpm ?? null,
-      data.power ?? null,
-      data.status ?? null
-    ).run();
+    // Store hourly aggregate only (raw data stays on-premise at gateway)
+    if (data.aggregate) {
+      const a = data.aggregate;
+      await this.env.DB.prepare(
+        `INSERT INTO telemetry_agg (
+          tenant_id, machine_id, hour_bucket, samples,
+          avg_temp, max_temp, min_temp,
+          avg_rpm, max_rpm, min_rpm,
+          avg_power, max_power, min_power,
+          status_summary, alerts_count, commands_count
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(tenant_id, machine_id, hour_bucket) DO UPDATE SET
+          samples = samples + excluded.samples,
+          avg_temp = (avg_temp * samples + excluded.avg_temp * excluded.samples) / (samples + excluded.samples),
+          max_temp = MAX(max_temp, excluded.max_temp),
+          min_temp = MIN(min_temp, excluded.min_temp),
+          avg_rpm = (avg_rpm * samples + excluded.avg_rpm * excluded.samples) / (samples + excluded.samples),
+          max_rpm = MAX(max_rpm, excluded.max_rpm),
+          min_rpm = MIN(min_rpm, excluded.min_rpm),
+          avg_power = (avg_power * samples + excluded.avg_power * excluded.samples) / (samples + excluded.samples),
+          max_power = MAX(max_power, excluded.max_power),
+          min_power = MIN(min_power, excluded.min_power),
+          alerts_count = alerts_count + excluded.alerts_count,
+          commands_count = commands_count + excluded.commands_count`
+      ).bind(
+        this.tenantId,
+        data.machine_id,
+        a.hour_bucket,
+        a.samples || 1,
+        a.avg_temp ?? null, a.max_temp ?? null, a.min_temp ?? null,
+        a.avg_rpm ?? null, a.max_rpm ?? null, a.min_rpm ?? null,
+        a.avg_power ?? null, a.max_power ?? null, a.min_power ?? null,
+        a.status_summary ?? null,
+        a.alerts_count ?? 0, a.commands_count ?? 0
+      ).run();
+    } else {
+      // Legacy raw ingest: reject or ignore
+      return Response.json({ ok: false, error: "Raw ingest disabled. Gateway must send aggregates." }, { status: 400 });
+    }
 
     // Audit (append-only)
     await logAudit(this.env, {
@@ -158,7 +186,7 @@ export class Tenant {
         "SELECT COUNT(*) as n FROM commands WHERE tenant_id = ? AND ts > unixepoch() - 86400"
       ).bind(this.tenantId).first(),
       this.env.DB.prepare(
-        "SELECT COUNT(DISTINCT machine_id) as n FROM telemetry WHERE tenant_id = ?"
+        "SELECT COUNT(DISTINCT machine_id) as n FROM telemetry_agg WHERE tenant_id = ?"
       ).bind(this.tenantId).first(),
     ]);
 
