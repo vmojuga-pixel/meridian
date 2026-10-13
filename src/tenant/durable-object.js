@@ -16,7 +16,9 @@ export class Tenant {
   async fetch(request) {
     const url = new URL(request.url);
     const path = url.pathname;
+    const upgrade = request.headers.get("Upgrade");
 
+    if (upgrade === "websocket") return this.handleWebSocket(request);
     if (path === "/ingest") return this.ingest(request);
     if (path === "/status") return this.status();
     if (path === "/report") return this.report();
@@ -66,6 +68,15 @@ export class Tenant {
       input: data,
       actions,
     });
+
+    this.state.waitUntil(this.broadcast({
+      type: "telemetry",
+      tenant_id: this.tenantId,
+      machine_id: data.machine_id,
+      data,
+      actions,
+      ts: Math.floor(Date.now() / 1000),
+    }));
 
     return Response.json({ ok: true, actions });
   }

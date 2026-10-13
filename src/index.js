@@ -121,6 +121,11 @@ export default {
       return securityHeaders(await handleRuleDelete(request, env, session, id));
     }
 
+    if (path === "/api/ws" && request.headers.get("Upgrade") === "websocket") {
+      const stub = env.TENANT.get(env.TENANT.idFromName(session.tenantId));
+      return stub.fetch(request);
+    }
+
     if (path === "/api/kill") return handleKillSwitch(request, env);
 
     const tenantId = session.tenantId;
