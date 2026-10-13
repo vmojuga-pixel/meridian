@@ -10,6 +10,7 @@ import { handleMachinesList, handleMachineCreate, handleMachineDelete } from "./
 import { handleApiKeyList, handleApiKeyCreate, handleApiKeyRevoke, verifyApiKey } from "./api/apikeys.js";
 import { handleTenantMe } from "./api/tenants.js";
 import { handle2FASetup, handle2FAVerify, handle2FADisable, handle2FAStatus } from "./api/2fa.js";
+import { handleInviteList, handleInviteCreate, handleInviteRevoke, handleInviteAccept } from "./api/invites.js";
 import { handleRulesList, handleRuleCreate, handleRuleUpdate, handleRuleDelete } from "./api/rules.js";
 import { requireAuth, requireCSRF, securityHeaders } from "./auth/middleware.js";
 import { LANDING_HTML } from "./web/landing.js";
@@ -43,12 +44,14 @@ export default {
     if (path === "/signup") return html(SIGNUP_HTML);
     if (path === "/login") return html(LOGIN_HTML);
     if (path === "/verify") return html(VERIFY_HTML);
+    if (path === "/accept") return html(ACCEPT_HTML);
 
     // --- Auth API ---
     if (path === "/api/auth/signup" && request.method === "POST") return handleSignup(request, env);
     if (path === "/api/auth/login" && request.method === "POST") return handleLogin(request, env);
     if (path === "/api/auth/logout" && request.method === "POST") return handleLogout(request, env);
     if (path === "/api/auth/verify" && request.method === "GET") return handleVerify(request, env);
+    if (path === "/api/auth/accept" && request.method === "POST") return handleInviteAccept(request, env);
 
     // --- Machine ingest via API key (no session) ---
     if (path.startsWith("/api/ingest")) {
@@ -125,6 +128,17 @@ export default {
     if (path === "/api/ws" && request.headers.get("Upgrade") === "websocket") {
       const stub = env.TENANT.get(env.TENANT.idFromName(session.tenantId));
       return stub.fetch(request);
+    }
+
+    if (path === "/api/invites" && request.method === "GET") {
+      return securityHeaders(await handleInviteList(request, env, session));
+    }
+    if (path === "/api/invites" && request.method === "POST") {
+      return securityHeaders(await handleInviteCreate(request, env, session));
+    }
+    if (path.startsWith("/api/invites/") && request.method === "DELETE") {
+      const id = path.slice("/api/invites/".length);
+      return securityHeaders(await handleInviteRevoke(request, env, session, id));
     }
 
     if (path === "/api/2fa/status" && request.method === "GET") {

@@ -26,6 +26,7 @@ tailwind.config = {
 <header class="border-b border-white/5 px-6 h-14 flex items-center gap-4 flex-shrink-0">
   <a href="/" class="font-mono text-xs tracking-[0.3em] uppercase text-neutral-400 hover:text-neutral-100">Meridian</a>
   <span class="font-mono text-xs text-neutral-500 border border-white/10 rounded px-2 py-1" id="tenant-label">...</span>
+  <button id="invites-btn" class="text-xs px-3 py-1.5 border border-white/10 rounded-md text-neutral-300 hover:border-white/25 transition">Team</button>
   <button id="2fa-btn" class="text-xs px-3 py-1.5 border border-white/10 rounded-md text-neutral-300 hover:border-white/25 transition">2FA</button>
   <button id="rules-btn" class="ml-auto text-xs px-3 py-1.5 bg-white text-black rounded-md font-medium hover:bg-neutral-200 transition">Rules</button>
   <button id="logout-btn" class="text-xs text-neutral-500 hover:text-red-400 transition">Logout</button>
@@ -122,6 +123,30 @@ tailwind.config = {
         <button type="submit" class="flex-1 py-2 bg-white text-black rounded-lg font-medium text-sm hover:bg-neutral-200 transition">Create</button>
       </div>
     </form>
+  </div>
+</div>
+
+<div id="invites-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+  <div class="w-full max-w-xl bg-ink-900 border border-white/10 rounded-xl p-6 my-8">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold">Team</h3>
+      <button id="invites-close" class="text-neutral-500 hover:text-neutral-200">Close</button>
+    </div>
+    <div id="invites-list" class="space-y-2 mb-4 max-h-60 overflow-y-auto">
+      <div class="text-xs text-neutral-600 text-center py-4">No invites</div>
+    </div>
+    <div class="border-t border-white/10 pt-4">
+      <div class="text-xs font-mono uppercase tracking-wider text-neutral-600 mb-3">Invite member</div>
+      <form id="invite-form" class="grid grid-cols-3 gap-3">
+        <input name="email" type="email" placeholder="email@company.com" required class="col-span-2 px-3 py-2 bg-ink-950 border border-white/10 rounded-lg text-sm outline-none focus:border-white/30">
+        <select name="role" class="px-3 py-2 bg-ink-950 border border-white/10 rounded-lg text-sm outline-none focus:border-white/30">
+          <option value="viewer">viewer</option>
+          <option value="admin">admin</option>
+        </select>
+        <div id="invite-msg" class="col-span-3 text-sm text-center"></div>
+        <button type="submit" class="col-span-3 py-2 bg-white text-black rounded-lg font-medium text-sm hover:bg-white/90 transition">Send invite</button>
+      </form>
+    </div>
   </div>
 </div>
 
@@ -582,6 +607,54 @@ tailwind.config = {
       }
     } catch (e) { body.innerHTML = '<div class="text-sm text-red-400">' + e.message + '</div>'; }
   }
+
+  $('invites-btn').addEventListener('click', () => { $('invites-modal').classList.remove('hidden'); loadInvites(); });
+  $('invites-close').addEventListener('click', () => $('invites-modal').classList.add('hidden'));
+
+  async function loadInvites() {
+    const list = $('invites-list');
+    try {
+      const r = await fetch('/api/invites', { headers: { 'X-CSRF-Token': csrf } });
+      const j = await r.json();
+      if (!r.ok) { list.innerHTML = '<div class="text-xs text-red-400 text-center py-4">' + (j.error || 'Failed') + '</div>'; return; }
+      const invites = (j.invites || []).filter(i => !i.accepted_at);
+      if (!invites.length) { list.innerHTML = '<div class="text-xs text-neutral-600 text-center py-4">No pending invites</div>'; return; }
+      list.innerHTML = invites.map(i => {
+        const exp = new Date(i.expires_at * 1000).toISOString().slice(0,10);
+        return '<div class="group flex items-center justify-between px-3 py-2 rounded-md bg-ink-950 border border-white/5 text-xs">' +
+          '<div><div class="text-neutral-300">' + i.email + '</div>' +
+          '<div class="text-neutral-600 font-mono">' + i.role + ' · exp ' + exp + '</div></div>' +
+          '<button data-revoke="' + i.id + '" class="text-neutral-600 hover:text-red-400 transition opacity-0 group-hover:opacity-100">Revoke</button>' +
+        '</div>';
+      }).join('');
+      list.querySelectorAll('[data-revoke]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Revoke invite?')) return;
+          await fetch('/api/invites/' + btn.getAttribute('data-revoke'), { method: 'DELETE', headers: { 'X-CSRF-Token': csrf } });
+          loadInvites();
+        });
+      });
+    } catch (e) { list.innerHTML = '<div class="text-xs text-red-400 text-center py-4">' + e.message + '</div>'; }
+  }
+
+  $('invite-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = $('invite-msg');
+    msg.textContent = '';
+    const data = Object.fromEntries(new FormData(e.target));
+    try {
+      const r = await fetch('/api/invites', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(data),
+      });
+      const j = await r.json();
+      if (!r.ok) { msg.innerHTML = '<span class="text-red-400">' + (j.error || 'Failed') + '</span>'; return; }
+      msg.innerHTML = '<span class="text-green-400">' + (j.email_sent ? 'Invite sent' : 'Invite created (email not sent)') + '</span>';
+      e.target.reset();
+      loadInvites();
+    } catch (err) { msg.innerHTML = '<span class="text-red-400">' + err.message + '</span>'; }
+  });
 
   (async () => {
     const me = await loadMe();

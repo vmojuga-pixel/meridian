@@ -146,3 +146,48 @@ export const VERIFY_HTML = `<!DOCTYPE html>
 })();
 </script>
 </body></html>`;
+
+
+export const ACCEPT_HTML = `<!DOCTYPE html>
+<html lang="en" class="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Accept invite — Meridian</title>${SHARED}</head>
+<body class="bg-ink-950 text-neutral-200 font-sans min-h-screen flex flex-col">
+<header class="border-b border-white/5 px-6 h-14 flex items-center"><a href="/" class="font-mono text-xs tracking-[0.3em] uppercase text-neutral-400">Meridian</a></header>
+<main class="flex-1 flex items-center justify-center p-6">
+<div class="w-full max-w-md">
+  <h1 class="text-3xl font-semibold tracking-tight mb-2">Accept invite</h1>
+  <p class="text-sm text-neutral-500 mb-8">Set a password to join the workspace.</p>
+  <form id="f" class="space-y-4">
+    <div><label class="block text-xs text-neutral-500 mb-1.5">Password <span class="text-neutral-600">(min 12, upper+lower+number)</span></label>
+    <input name="password" type="password" required minlength="12" class="w-full px-3.5 py-2.5 bg-ink-900 border border-white/10 rounded-lg text-sm outline-none focus:border-white/30"></div>
+    <button type="submit" class="w-full py-2.5 bg-white text-black rounded-lg font-medium text-sm hover:bg-neutral-200 transition disabled:opacity-50">Create account</button>
+    <div id="msg" class="text-sm text-center"></div>
+  </form>
+  <p class="text-sm text-neutral-500 text-center mt-6">Already have an account? <a href="/login" class="text-neutral-200 hover:underline">Log in</a></p>
+</div>
+</main>
+<script>
+const f = document.getElementById('f');
+const msg = document.getElementById('msg');
+f.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  msg.textContent = '';
+  const btn = f.querySelector('button');
+  btn.disabled = true;
+  const token = new URLSearchParams(location.search).get('token');
+  if (!token) { msg.innerHTML = '<span class="text-red-400">Missing token</span>'; btn.disabled = false; return; }
+  const data = Object.fromEntries(new FormData(f));
+  try {
+    const r = await fetch('/api/auth/accept', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, password: data.password })
+    });
+    const j = await r.json();
+    if (!r.ok) { msg.innerHTML = '<span class="text-red-400">' + (j.error || 'Failed') + '</span>'; return; }
+    msg.innerHTML = '<span class="text-green-400">' + j.message + '</span>';
+    setTimeout(() => location.href = '/login', 1500);
+  } catch (err) { msg.innerHTML = '<span class="text-red-400">' + err.message + '</span>'; }
+  finally { btn.disabled = false; }
+});
+</script>
+</body></html>`;

@@ -46,6 +46,43 @@ async function sendViaMailtrap(env, { to, factoryName, verifyUrl, from }) {
   return { ok: true, provider: "mailtrap", messageId: j.message_ids?.[0] };
 }
 
+function renderInvite(factoryName, role, inviteUrl) {
+  return `<!DOCTYPE html><html><body style="font-family:-apple-system,sans-serif;background:#0a0a0a;color:#e5e5e5;padding:40px 20px;">
+<div style="max-width:520px;margin:0 auto;background:#141414;border:1px solid #262626;border-radius:12px;padding:40px;">
+  <div style="font-size:12px;letter-spacing:3px;text-transform:uppercase;color:#737373;margin-bottom:8px;">Meridian</div>
+  <h1 style="font-size:24px;margin:0 0 16px;">You're invited</h1>
+  <p style="color:#a3a3a3;line-height:1.6;margin-bottom:24px;">You've been invited to join <strong style="color:#e5e5e5">${factoryName}</strong> as <strong style="color:#e5e5e5">${role}</strong>.</p>
+  <a href="${inviteUrl}" style="display:inline-block;background:#e5e5e5;color:#0a0a0a;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">Accept invite</a>
+  <p style="color:#525252;font-size:13px;margin-top:32px;">This invite expires in 7 days.</p>
+</div></body></html>`;
+}
+
+export async function sendInviteEmail(env, { to, factoryName, role, inviteUrl }) {
+  const from = env.EMAIL_FROM || "noreply@meridian.local";
+  const html = renderInvite(factoryName, role, inviteUrl);
+
+  if (env.BREVO_API_KEY) {
+    try {
+      const r = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: { "api-key": env.BREVO_API_KEY, "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({
+          sender: { email: from, name: "Meridian" },
+          to: [{ email: to }],
+          subject: `Invitation to ${factoryName} on Meridian`,
+          htmlContent: html,
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) return { ok: true, provider: "brevo", messageId: j.messageId };
+      return { ok: false, provider: "brevo", status: r.status };
+    } catch (e) {
+      return { ok: false, provider: "brevo", error: e.message };
+    }
+  }
+  return { ok: false, reason: "no_provider" };
+}
+
 export async function sendVerifyEmail(env, { to, factoryName, verifyUrl }) {
   const from = env.EMAIL_FROM || "noreply@meridian.local";
   const attempts = [];
