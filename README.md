@@ -16,13 +16,21 @@ Related: **meridian-edge** (Python gateway), Picksy (affiliate), BorneoMe (trave
 - Machines: CRUD, per-tenant
 - Rules: CRUD + marketplace templates
 - API Keys: scoped (ingest:write/read)
-- Realtime: WebSocket broadcast on telemetry
+- Realtime: WebSocket broadcast on aggregate ingest
 - Audit log: D1 + R2 (immutable)
 - Billing: plans, usage limits, Stripe checkout
 - Email: Brevo + Mailtrap fallback
 - Edge Gateway: Python (Modbus/OPC-UA/Serial)
 - UI: Tailwind (landing, dashboard, Meri, onboarding, auth)
 - Compliance: EU AI Act (audit, guardrails, explainability)
+
+## Documentation
+
+- `BLUEPRINT.md` — source of truth: architecture, data flow, features, roadmap
+- `ARCHITECTURE.md` — layers, schemas, security
+- `HANDOVER.md` — deploy, migrations, failure modes
+- `CODING_BOOK.md` — lessons learned, 100+ entries
+- `COMPLIANCE.md` — EU AI Act, GDPR, IEC 62443
 
 ## Endpoints
 
