@@ -12,6 +12,7 @@ import { handleTenantMe } from "./api/tenants.js";
 import { handle2FASetup, handle2FAVerify, handle2FADisable, handle2FAStatus } from "./api/2fa.js";
 import { handleInviteList, handleInviteCreate, handleInviteRevoke, handleInviteAccept } from "./api/invites.js";
 import { handlePlans, handleCurrentPlan, handleSelectPlan, handleStripeCheckout, handleStripeWebhook } from "./api/billing.js";
+import { handleTemplatesList, handleTemplateInstall } from "./api/templates.js";
 import { handleRulesList, handleRuleCreate, handleRuleUpdate, handleRuleDelete } from "./api/rules.js";
 import { requireAuth, requireCSRF, securityHeaders } from "./auth/middleware.js";
 import { LANDING_HTML } from "./web/landing.js";
@@ -130,6 +131,14 @@ export default {
     if (path === "/api/ws" && request.headers.get("Upgrade") === "websocket") {
       const stub = env.TENANT.get(env.TENANT.idFromName(session.tenantId));
       return stub.fetch(request);
+    }
+
+    if (path === "/api/templates" && request.method === "GET") {
+      return securityHeaders(await handleTemplatesList(request, env));
+    }
+    if (path.startsWith("/api/templates/") && path.endsWith("/install") && request.method === "POST") {
+      const id = path.slice("/api/templates/".length, -"/install".length);
+      return securityHeaders(await handleTemplateInstall(request, env, session, id));
     }
 
     if (path === "/api/billing/plans" && request.method === "GET") {

@@ -182,6 +182,13 @@ tailwind.config = {
     <div id="rules-list" class="space-y-2 mb-4 max-h-80 overflow-y-auto">
       <div class="text-xs text-neutral-600 text-center py-4">No rules</div>
     </div>
+    <div class="border-t border-white/10 pt-4 mb-4">
+      <div class="text-xs font-mono uppercase tracking-wider text-neutral-600 mb-3">Marketplace</div>
+      <div id="templates-list" class="grid md:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+        <div class="text-xs text-neutral-600 col-span-2 text-center py-4">Loading...</div>
+      </div>
+    </div>
+
     <div class="border-t border-white/10 pt-4">
       <div class="text-xs font-mono uppercase tracking-wider text-neutral-600 mb-3">New rule</div>
       <form id="rule-form" class="grid grid-cols-2 gap-3">
@@ -486,7 +493,42 @@ tailwind.config = {
     } catch (err) { msg.innerHTML = '<span class="text-red-400">' + err.message + '</span>'; }
   });
 
-  $('rules-btn').addEventListener('click', () => { $('rules-modal').classList.remove('hidden'); loadRules(); });
+  $('rules-btn').addEventListener('click', () => { $('rules-modal').classList.remove('hidden'); loadRules(); loadTemplates(); });
+
+  async function loadTemplates() {
+    const list = $('templates-list');
+    try {
+      const r = await fetch('/api/templates', { headers: { 'X-CSRF-Token': csrf } });
+      const j = await r.json();
+      const tpls = j.templates || [];
+      if (!tpls.length) { list.innerHTML = '<div class="text-xs text-neutral-600 col-span-2 text-center py-4">No templates</div>'; return; }
+      list.innerHTML = tpls.map(t => {
+        const c = JSON.parse(t.config);
+        return '<div class="group p-3 rounded-md bg-ink-950 border border-white/5 text-xs">' +
+          '<div class="flex items-start justify-between gap-2">' +
+            '<div class="min-w-0">' +
+              '<div class="font-medium text-neutral-300 truncate">' + t.name + '</div>' +
+              '<div class="text-neutral-600 font-mono text-[10px] mt-0.5">' + c.metric + ' ' + c.operator + ' ' + c.threshold + '</div>' +
+              '<div class="text-neutral-600 text-[10px] mt-0.5">' + (t.category || '') + ' · ' + (t.installs || 0) + ' installs</div>' +
+            '</div>' +
+            '<button data-tpl="' + t.id + '" class="text-neutral-500 hover:text-green-400 transition flex-shrink-0">+ Install</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+      list.querySelectorAll('[data-tpl]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.getAttribute('data-tpl');
+          const r2 = await fetch('/api/templates/' + id + '/install', { method: 'POST', headers: { 'X-CSRF-Token': csrf } });
+          const j2 = await r2.json();
+          if (!r2.ok) { alert(j2.error || 'Install failed'); return; }
+          btn.textContent = 'Installed';
+          btn.classList.add('text-green-400');
+          btn.disabled = true;
+          loadRules();
+        });
+      });
+    } catch (e) { list.innerHTML = '<div class="text-xs text-red-400 col-span-2 text-center py-4">' + e.message + '</div>'; }
+  }
   $('rules-close').addEventListener('click', () => $('rules-modal').classList.add('hidden'));
 
   async function loadRules() {
