@@ -83,3 +83,71 @@ Log masalah + fix. Format: **Masalah -> Punca -> Fix**.
 5. Audit log -> D1 + R2 (redundant).
 6. LLM = advisor only. Rules = controller.
 7. Jangan simpan API key plaintext. SHA-256 hash.
+
+---
+
+## Meridian-specific entries
+
+### 101. Heredoc terputus — display glitch mobile
+
+**Masalah:** Output terminal nampak garbled, fail seolah rosak.
+
+**Punca:** Mobile SSH buffer glitch, bukan fail sebenar.
+
+**Fix:** Verify dengan `wc -l`, `head`, `tail`, `grep -c` sebelum percaya display.
+
+### 102. Nested backtick dalam template literal
+
+**Masalah:** `SyntaxError: Unexpected token 'class'`.
+
+**Punca:** Template literal guna backtick dalam backtick.
+
+**Fix:** Guna string concat: `'<span class="' + cls + '">' + s + '</span>'`.
+
+### 103. Route order — public endpoint kena sebelum auth
+
+**Masalah:** `/api/meri/public` bagi 401.
+
+**Punca:** Route terletak selepas `requireAuth`.
+
+**Fix:** Public routes di atas, sebelum `requireAuth`. Check dengan `grep -n "requireAuth\|meri/public" src/index.js`.
+
+### 104. Token CF vs API_TOKEN generic
+
+**Masalah:** Wrangler error `Invalid format for Authorization header [code: 6111]`.
+
+**Punca:** `API_TOKEN` dalam `.env` bukan token CF. Salah overwrite.
+
+**Fix:** Guna `/root/.cf-key` untuk token CF. Jangan letak dalam `.env` yang shared dengan projek lain.
+
+### 105. Raw data bocor ke cloud
+
+**Masalah:** Cloud simpan setiap bacaan mentah, langgar blueprint.
+
+**Punca:** DO `INSERT INTO telemetry` untuk setiap ingest.
+
+**Fix:** Gateway simpan raw dalam SQLite tempatan. Hantar aggregate sahaja. Cloud UPSERT ke `telemetry_agg`.
+
+### 106. LLM bocor detail teknikal
+
+**Masalah:** Meri sebut "Cloudflare", "Durable Objects", nama vendor.
+
+**Punca:** Llama 3.2 3B tak ikut prompt kuat.
+
+**Fix:** Output sanitizer server-side — buang ayat yang ada term dalam BANNED list.
+
+### 107. Rate limit ikut IP, bukan user
+
+**Masalah:** Meri public disalah guna.
+
+**Punca:** Tiada had.
+
+**Fix:** KV counter key `rl:meri:public:<IP>`, max 10/jam, expirationTtl 3600.
+
+### 108. Redirect vs JSON untuk HTML page
+
+**Masalah:** `/dashboard` tanpa login bagi `{"error":"Unauthorized"}`.
+
+**Punca:** Route HTML selepas auth check, tapi return raw error.
+
+**Fix:** Kalau path HTML (`/dashboard`, `/meri`, `/onboarding`), redirect 302 ke `/login`. Kalau API, return JSON.
