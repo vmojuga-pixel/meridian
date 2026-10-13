@@ -1,72 +1,59 @@
 # Meridian
 
-> Deterministic rules engine for legacy industrial systems.
-> Edge-native. Multi-tenant. EU AI Act ready.
+Deterministic rules engine for legacy industrial systems.
+Edge-native. Multi-tenant. EU AI Act ready.
 
-## What is Meridian?
+**Meri** is the chatbox — AI advisor. Meri never controls machines.
 
-Meridian bridges legacy industrial machines (PLC, SCADA, Modbus, OPC-UA)
-with modern AI-driven operations -- without replacing existing infrastructure.
-
-Runs on Cloudflare Workers. Durable Objects per tenant. D1 per tenant.
-Every factory gets isolated rules, data, and audit trail.
-
-**Meri** is the chatbox -- AI advisor. Meri never controls machines.
-
-## Core Principles
-
-1. Deterministic first -- rules engine controls, not LLMs.
-2. Data sovereignty -- data stays on-premise by default.
-3. Compliance by design -- every action logged and auditable.
-4. Edge-native -- auto-scales, zero ops.
-5. LLM as advisor -- Meri suggests, humans decide.
-
-## Architecture
-
-    [Legacy Machines] -> [Edge Gateway] -> [Cloudflare Workers]
-                                              |
-                                    [Durable Objects per tenant]
-                                              |
-                                    [D1] [KV] [R2] [Queues]
+Related: **meridian-edge** (Python gateway), Picksy (affiliate), BorneoMe (travel).
 
 ## Features
 
-- Multi-tenant (per-factory Durable Object)
-- Rules engine (deterministic, hot-reloadable via KV)
-- Real-time telemetry ingestion
-- Guardrails (rate limit, kill switch, human override)
-- Immutable audit log (R2)
-- Meri chatbox (LLM advisor)
-- Edge-native (Cloudflare Workers)
+- Auth: signup, login, verify, session, CSRF, rate limit, lockout
+- 2FA: TOTP + recovery codes
+- Team: invites, roles (owner/admin/viewer)
+- Onboarding: 3-step wizard
+- Machines: CRUD, per-tenant
+- Rules: CRUD + marketplace templates
+- API Keys: scoped (ingest:write/read)
+- Realtime: WebSocket broadcast on telemetry
+- Audit log: D1 + R2 (immutable)
+- Billing: plans, usage limits, Stripe checkout
+- Email: Brevo + Mailtrap fallback
+- Edge Gateway: Python (Modbus/OPC-UA/Serial)
+- UI: Tailwind (landing, dashboard, Meri, onboarding, auth)
+- Compliance: EU AI Act (audit, guardrails, explainability)
 
-## Quick Start
+## Endpoints
 
-    npm install
-    npx wrangler login
-    npx wrangler d1 create meridian-db
-    npx wrangler kv:namespace create MERIDIAN_KV
-    npx wrangler r2 bucket create meridian-audit
-    npx wrangler d1 migrations apply meridian-db
-    npx wrangler deploy
+Public:
+- `GET /` — landing
+- `GET /signup`, `GET /login`, `GET /verify`, `GET /accept`
+- `POST /api/auth/signup`, `/login`, `/logout`
+- `GET /api/auth/verify`, `/me`
+- `POST /api/auth/accept`
+- `POST /api/stripe/webhook`
+- `GET /health`
 
-Update wrangler.toml with the IDs returned.
+Authed:
+- `GET /dashboard`, `/meri`, `/onboarding`
+- `GET/POST/PATCH/DELETE /api/machines`
+- `GET/POST/PATCH/DELETE /api/rules`
+- `GET/POST/DELETE /api/keys`
+- `GET/POST/DELETE /api/invites`
+- `GET/POST /api/2fa/*`
+- `GET /api/billing/plans`, `/current`; `POST /select`, `/checkout`
+- `GET /api/templates`; `POST /api/templates/:id/install`
+- `POST /api/ingest` (via API key, no session)
+- `POST /api/commands`
+- `GET /api/dashboard`
+- `POST /api/meri/chat`
+- `WS /api/ws`
+- `POST /api/kill`
 
-## API
+## Deploy
 
-    POST /api/ingest        # telemetry
-    GET  /api/dashboard     # status
-    POST /api/commands      # outbound commands
-    POST /api/meri/chat     # ask Meri
-    POST /api/kill          # kill switch
-    GET  /health            # health check
-
-All tenant-scoped routes require X-Tenant-ID header.
-
-## Related Projects
-
-- Picksy -- affiliate platform
-- BorneoMe -- travel platform
-- Meridian -- industrial AI
+Cloudflare Workers. Auto via wrangler or GitHub Actions (needs `CF_API_TOKEN`, `CF_ACCOUNT_ID` secrets).
 
 ## License
 
