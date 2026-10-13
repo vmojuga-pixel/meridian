@@ -9,6 +9,7 @@ import { handleSignup, handleLogin, handleLogout, handleVerify, handleMe } from 
 import { handleMachinesList, handleMachineCreate, handleMachineDelete } from "./api/machines.js";
 import { handleApiKeyList, handleApiKeyCreate, handleApiKeyRevoke, verifyApiKey } from "./api/apikeys.js";
 import { handleTenantMe } from "./api/tenants.js";
+import { handleRulesList, handleRuleCreate, handleRuleUpdate, handleRuleDelete } from "./api/rules.js";
 import { requireAuth, requireCSRF, securityHeaders } from "./auth/middleware.js";
 import { LANDING_HTML } from "./web/landing.js";
 import { DASHBOARD_HTML } from "./web/dashboard.js";
@@ -103,6 +104,21 @@ export default {
 
     if (path === "/api/tenants/me") {
       return securityHeaders(await handleTenantMe(request, env, session));
+    }
+
+    if (path === "/api/rules" && request.method === "GET") {
+      return securityHeaders(await handleRulesList(request, env, session));
+    }
+    if (path === "/api/rules" && request.method === "POST") {
+      return securityHeaders(await handleRuleCreate(request, env, session));
+    }
+    if (path.startsWith("/api/rules/") && request.method === "PATCH") {
+      const id = path.slice("/api/rules/".length);
+      return securityHeaders(await handleRuleUpdate(request, env, session, id));
+    }
+    if (path.startsWith("/api/rules/") && request.method === "DELETE") {
+      const id = path.slice("/api/rules/".length);
+      return securityHeaders(await handleRuleDelete(request, env, session, id));
     }
 
     if (path === "/api/kill") return handleKillSwitch(request, env);

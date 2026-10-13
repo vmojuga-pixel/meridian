@@ -26,7 +26,8 @@ tailwind.config = {
 <header class="border-b border-white/5 px-6 h-14 flex items-center gap-4 flex-shrink-0">
   <a href="/" class="font-mono text-xs tracking-[0.3em] uppercase text-neutral-400 hover:text-neutral-100">Meridian</a>
   <span class="font-mono text-xs text-neutral-500 border border-white/10 rounded px-2 py-1" id="tenant-label">...</span>
-  <button id="logout-btn" class="ml-auto text-xs text-neutral-500 hover:text-red-400 transition">Logout</button>
+  <button id="rules-btn" class="ml-auto text-xs px-3 py-1.5 bg-white text-black rounded-md font-medium hover:bg-neutral-200 transition">Rules</button>
+  <button id="logout-btn" class="text-xs text-neutral-500 hover:text-red-400 transition">Logout</button>
   <div class="flex items-center gap-2 text-xs text-green-500">
     <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
     <span id="status-label">Live</span>
@@ -120,6 +121,49 @@ tailwind.config = {
         <button type="submit" class="flex-1 py-2 bg-white text-black rounded-lg font-medium text-sm hover:bg-neutral-200 transition">Create</button>
       </div>
     </form>
+  </div>
+</div>
+
+<div id="rules-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+  <div class="w-full max-w-2xl bg-ink-900 border border-white/10 rounded-xl p-6 my-8">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold">Rules</h3>
+      <button id="rules-close" class="text-neutral-500 hover:text-neutral-200">Close</button>
+    </div>
+    <div id="rules-list" class="space-y-2 mb-4 max-h-80 overflow-y-auto">
+      <div class="text-xs text-neutral-600 text-center py-4">No rules</div>
+    </div>
+    <div class="border-t border-white/10 pt-4">
+      <div class="text-xs font-mono uppercase tracking-wider text-neutral-600 mb-3">New rule</div>
+      <form id="rule-form" class="grid grid-cols-2 gap-3">
+        <input name="name" placeholder="Name (e.g. Temp high)" required class="col-span-2 px-3 py-2 bg-ink-950 border border-white/10 rounded-lg text-sm outline-none focus:border-white/30">
+        <select name="metric" class="px-3 py-2 bg-ink-950 border border-white/10 rounded-lg text-sm outline-none focus:border-white/30">
+          <option value="temp">Temp</option>
+          <option value="rpm">RPM</option>
+          <option value="power">Power</option>
+        </select>
+        <select name="operator" class="px-3 py-2 bg-ink-950 border border-white/10 rounded-lg text-sm outline-none focus:border-white/30">
+          <option value="gt">&gt;</option>
+          <option value="gte">&gt;=</option>
+          <option value="lt">&lt;</option>
+          <option value="lte">&lt;=</option>
+          <option value="eq">=</option>
+        </select>
+        <input name="threshold" type="number" placeholder="Threshold" required class="px-3 py-2 bg-ink-950 border border-white/10 rounded-lg text-sm outline-none focus:border-white/30">
+        <select name="severity" class="px-3 py-2 bg-ink-950 border border-white/10 rounded-lg text-sm outline-none focus:border-white/30">
+          <option value="info">info</option>
+          <option value="warning">warning</option>
+          <option value="critical">critical</option>
+        </select>
+        <select name="action" class="px-3 py-2 bg-ink-950 border border-white/10 rounded-lg text-sm outline-none focus:border-white/30">
+          <option value="alert">alert</option>
+          <option value="command">command</option>
+        </select>
+        <input name="action_value" type="number" placeholder="Action value (opt)" class="px-3 py-2 bg-ink-950 border border-white/10 rounded-lg text-sm outline-none focus:border-white/30">
+        <div id="rule-msg" class="col-span-2 text-sm text-center"></div>
+        <button type="submit" class="col-span-2 py-2 bg-white text-black rounded-lg font-medium text-sm hover:bg-neutral-200 transition">Add rule</button>
+      </form>
+    </div>
   </div>
 </div>
 
@@ -390,6 +434,52 @@ tailwind.config = {
       $('key-value').textContent = j.key.key;
       $('key-reveal').classList.remove('hidden');
       loadKeys();
+    } catch (err) { msg.innerHTML = '<span class="text-red-400">' + err.message + '</span>'; }
+  });
+
+  $('rules-btn').addEventListener('click', () => { $('rules-modal').classList.remove('hidden'); loadRules(); });
+  $('rules-close').addEventListener('click', () => $('rules-modal').classList.add('hidden'));
+
+  async function loadRules() {
+    try {
+      const r = await fetch('/api/rules', { headers: { 'X-CSRF-Token': csrf } });
+      const j = await r.json();
+      const list = $('rules-list');
+      const rules = j.rules || [];
+      if (!rules.length) { list.innerHTML = '<div class="text-xs text-neutral-600 text-center py-4">No rules</div>'; return; }
+      list.innerHTML = rules.map(r2 => {
+        const c = JSON.parse(r2.config);
+        return '<div class="group flex items-center justify-between px-3 py-2 rounded-md bg-ink-950 border border-white/5 text-xs">' +
+          '<div><div class="font-medium text-neutral-300">' + r2.name + '</div>' +
+          '<div class="text-neutral-600 font-mono">' + c.metric + ' ' + c.operator + ' ' + c.threshold + ' → ' + c.action + ' (' + c.severity + ')</div></div>' +
+          '<button data-del="' + r2.id + '" class="text-neutral-600 hover:text-red-400 transition opacity-0 group-hover:opacity-100">Delete</button>' +
+        '</div>';
+      }).join('');
+      list.querySelectorAll('[data-del]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Delete rule?')) return;
+          await fetch('/api/rules/' + btn.getAttribute('data-del'), { method: 'DELETE', headers: { 'X-CSRF-Token': csrf } });
+          loadRules();
+        });
+      });
+    } catch (e) { console.error(e); }
+  }
+
+  $('rule-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = $('rule-msg');
+    msg.textContent = '';
+    const data = Object.fromEntries(new FormData(e.target));
+    try {
+      const r = await fetch('/api/rules', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(data),
+      });
+      const j = await r.json();
+      if (!r.ok) { msg.innerHTML = '<span class="text-red-400">' + (j.error || 'Failed') + '</span>'; return; }
+      e.target.reset();
+      loadRules();
     } catch (err) { msg.innerHTML = '<span class="text-red-400">' + err.message + '</span>'; }
   });
 

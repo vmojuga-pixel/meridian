@@ -1,5 +1,6 @@
 import { RulesEngine } from "../rules/engine.js";
 import { DEFAULT_RULES } from "../rules/registry.js";
+import { loadTenantRules } from "../api/rules.js";
 import { logAudit } from "../audit/log.js";
 import { checkRateLimit } from "../guardrail/rate-limit.js";
 import { isKilled } from "../guardrail/kill-switch.js";
@@ -67,6 +68,32 @@ export class Tenant {
     });
 
     return Response.json({ ok: true, actions });
+  }
+
+  compileRules(dbRules) {
+    const ops = {
+      gt: (a, b) => a > b,
+      gte: (a, b) => a >= b,
+      lt: (a, b) => a < b,
+      lte: (a, b) => a <= b,
+      eq: (a, b) => a === b,
+      neq: (a, b) => a !== b,
+    };
+    return dbRules.map(r => ({
+      id: r.id,
+      name: r.name,
+      enabled: true,
+      when: (d) => {
+        const v = d[r.metric];
+        if (v === undefined || v === null) return false;
+        return ops[r.operator](Number(v), Number(r.threshold));
+      },
+      then: (ctx, d) => {
+        if (r.action === "alert") ctx.alert(`[${r.name}] ${r.metric}=${d[r.metric]}`, r.severity || "warning");
+        else if (r.action === "command") ctx.command("set", r.action_value, r.id);
+        else if (r.action === "clear") ctx.clearAlert();
+      },
+    }));
   }
 
   makeContext(machineId) {
