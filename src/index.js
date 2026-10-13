@@ -4,6 +4,7 @@ import { handleCommands } from "./api/commands.js";
 import { handleDashboard } from "./api/dashboard.js";
 import { handleHealth } from "./api/health.js";
 import { handleMeriChat } from "./meri/chat.js";
+import { handlePublicMeriChat } from "./meri/public.js";
 import { handleKillSwitch } from "./guardrail/kill-switch.js";
 import { handleSignup, handleLogin, handleLogout, handleVerify, handleMe } from "./api/auth.js";
 import { handleMachinesList, handleMachineCreate, handleMachineDelete } from "./api/machines.js";
@@ -40,6 +41,9 @@ export default {
       });
     }
 
+    // --- Public Meri (no auth) ---
+    if (path === "/api/meri/public" && request.method === "POST") return handlePublicMeriChat(request, env);
+
     // --- Public routes ---
     if (path === "/health") return handleHealth();
     if (path === "/" || path === "") return html(LANDING_HTML);
@@ -66,7 +70,12 @@ export default {
 
     // --- Auth required below ---
     const auth = await requireAuth(env, request);
-    if (auth.error) return securityHeaders(auth.error);
+    if (auth.error) {
+      if (path === "/dashboard" || path === "/meri" || path === "/onboarding") {
+        return Response.redirect(new URL("/login", request.url).toString(), 302);
+      }
+      return securityHeaders(auth.error);
+    }
     const session = auth.session;
 
     const csrf = await requireCSRF(env, request, session);

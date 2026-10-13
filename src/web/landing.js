@@ -33,8 +33,8 @@ tailwind.config = {
       <a href="#compliance" class="hover:text-neutral-100 transition">Compliance</a>
     </nav>
     <div class="flex items-center gap-3">
-      <a href="/dashboard" class="text-sm text-neutral-400 hover:text-neutral-100 transition hidden sm:block">Dashboard</a>
-      <a href="/meri" class="text-sm px-4 py-2 rounded-lg bg-white text-black font-medium hover:bg-neutral-200 transition">Open Meri</a>
+      <a href="/login" class="text-sm text-neutral-400 hover:text-neutral-100 transition">Login</a>
+      <a href="/signup" class="text-sm px-4 py-2 rounded-lg bg-white text-black font-medium hover:bg-neutral-200 transition">Get started</a>
     </div>
   </div>
 </header>
@@ -52,8 +52,8 @@ tailwind.config = {
       Meridian bridges PLCs, SCADA, and Modbus with modern AI operations — without replacing your existing infrastructure. Runs on Cloudflare Edge. Multi-tenant. Auditable.
     </p>
     <div class="flex flex-wrap items-center gap-4">
-      <a href="/dashboard" class="px-6 py-3.5 rounded-lg bg-white text-black font-medium text-sm hover:bg-neutral-200 transition">Open dashboard</a>
-      <a href="/meri" class="px-6 py-3.5 rounded-lg border border-white/10 text-sm hover:border-white/25 transition">Talk to Meri</a>
+      <a href="/signup" class="px-6 py-3.5 rounded-lg bg-white text-black font-medium text-sm hover:bg-neutral-200 transition">Get started free</a>
+      <a href="/login" class="px-6 py-3.5 rounded-lg border border-white/10 text-sm hover:border-white/25 transition">Login</a>
     </div>
   </div>
 </section>
@@ -182,6 +182,79 @@ tailwind.config = {
     </div>
   </div>
 </footer>
+
+
+<!-- Meri Inline Chatbox -->
+<section id="ask-meri" style="padding:80px 24px 100px;border-bottom:1px solid rgba(255,255,255,0.05);">
+  <div style="max-width:640px;margin:0 auto 32px;">
+    <div style="font-family:ui-monospace,monospace;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#525252;margin-bottom:12px;">Ask Meri</div>
+    <h2 style="font-size:32px;font-weight:600;letter-spacing:-0.5px;margin-bottom:12px;">Questions? Ask Meri.</h2>
+    <p style="color:#737373;font-size:15px;line-height:1.5;">Meri knows Meridian inside-out. Features, pricing, architecture, compliance. Ask anything.</p>
+  </div>
+<div id="meri-panel" style="display:flex;width:100%;max-width:640px;height:520px;background:#141414;border:1px solid #262626;border-radius:16px;flex-direction:column;overflow:hidden;box-shadow:0 8px 40px rgba(0,0,0,0.4);margin:0 auto;">
+  <div style="padding:14px 16px;border-bottom:1px solid #262626;display:flex;align-items:center;gap:8px;flex-shrink:0;">
+    <div style="font-weight:600;font-size:14px;">Meri</div>
+    <div style="font-size:11px;color:#737373;margin-left:auto;font-family:ui-monospace,monospace;">meridian assistant</div>
+    
+  </div>
+  <div id="meri-msgs" style="flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;">
+    <div style="background:#1a1a1a;border:1px solid #262626;border-radius:10px;padding:10px 13px;font-size:13px;color:#d4d4d4;line-height:1.5;max-width:90%;">Hi. I can explain Meridian — features, pricing, architecture, compliance. Ask me anything.</div>
+  </div>
+  <form id="meri-form" style="padding:12px;border-top:1px solid #262626;display:flex;gap:8px;flex-shrink:0;">
+    <input id="meri-input" type="text" placeholder="Ask about Meridian..." autocomplete="off" required style="flex:1;padding:10px 12px;background:#0a0a0a;border:1px solid #262626;border-radius:8px;color:#e5e5e5;font-size:13px;outline:none;">
+    <button type="submit" id="meri-send" style="padding:10px 14px;background:#e5e5e5;color:#0a0a0a;border:none;border-radius:8px;font-weight:600;font-size:13px;cursor:pointer;">Send</button>
+  </form>
+</div>
+</section>
+
+<script>
+(function(){
+  const form = document.getElementById("meri-form");
+  const input = document.getElementById("meri-input");
+  const msgs = document.getElementById("meri-msgs");
+  const send = document.getElementById("meri-send");
+  let history = [];
+
+  function add(text, who){
+    const d = document.createElement("div");
+    const base = "border-radius:10px;padding:10px 13px;font-size:13px;line-height:1.5;max-width:90%;white-space:pre-wrap;";
+    d.style.cssText = base + (who === "user"
+      ? "background:#1d4ed8;color:#fff;align-self:flex-end;"
+      : "background:#1a1a1a;border:1px solid #262626;color:#d4d4d4;align-self:flex-start;");
+    d.textContent = text;
+    msgs.appendChild(d);
+    msgs.scrollTop = msgs.scrollHeight;
+    return d;
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    add(text, "user");
+    input.value = "";
+    send.disabled = true;
+    const loading = add("...", "meri");
+    try {
+      const r = await fetch("/api/meri/public", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, history })
+      });
+      const j = await r.json();
+      loading.textContent = j.reply || j.error || "No reply.";
+      history.push({ role: "user", content: text });
+      history.push({ role: "assistant", content: loading.textContent });
+      history = history.slice(-6);
+    } catch (err) {
+      loading.textContent = "Error: " + err.message;
+    } finally {
+      send.disabled = false;
+      input.focus();
+    }
+  });
+})();
+</script>
 
 </body>
 </html>`;
