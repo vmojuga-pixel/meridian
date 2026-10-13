@@ -3,6 +3,7 @@ import { createSession, destroySession, clearCookie, getSession } from "../auth/
 import { checkRateLimit } from "../auth/rate-limit.js";
 import { logAuth } from "../auth/audit.js";
 import { sendVerifyEmail } from "../auth/email.js";
+import { verify2FAChallenge } from "./2fa.js";
 
 function ip(request) { return request.headers.get("CF-Connecting-IP") || "unknown"; }
 function ua(request) { return request.headers.get("User-Agent") || "unknown"; }
@@ -76,7 +77,7 @@ export async function handleLogin(request, env) {
   if (!email || !password) return Response.json({ error: "Email and password required" }, { status: 400 });
 
   const user = await env.DB.prepare(
-    "SELECT id, tenant_id, email, password_hash, salt, role, email_verified, failed_attempts, locked_until FROM users WHERE email = ?"
+    "SELECT id, tenant_id, email, password_hash, salt, role, email_verified, failed_attempts, locked_until, totp_enabled FROM users WHERE email = ?"
   ).bind(email.toLowerCase()).first();
 
   const genericError = Response.json({ error: "Invalid credentials" }, { status: 401 });
@@ -105,6 +106,18 @@ export async function handleLogin(request, env) {
   if (!user.email_verified) {
     await logAuth(env, "login_unverified", { userId: user.id, tenantId: user.tenant_id, ip: ip(request), ua: ua(request) });
     return Response.json({ error: "Email not verified" }, { status: 403 });
+  }
+
+  if (user.totp_enabled === 1) {
+    const { totp } = await request.json().catch(() => ({}));
+    if (!totp) {
+      return Response.json({ ok: false, requires_2fa: true }, { status: 200 });
+    }
+    const valid = await verify2FAChallenge(env, user.id, totp);
+    if (!valid) {
+      await logAuth(env, "2fa_failed", { userId: user.id, tenantId: user.tenant_id, ip: ip(request), ua: ua(request) });
+      return Response.json({ error: "Invalid 2FA code", requires_2fa: true }, { status: 401 });
+    }
   }
 
   await env.DB.prepare("UPDATE users SET failed_attempts = 0, locked_until = NULL WHERE id = ?").bind(user.id).run();

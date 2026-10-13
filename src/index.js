@@ -9,6 +9,7 @@ import { handleSignup, handleLogin, handleLogout, handleVerify, handleMe } from 
 import { handleMachinesList, handleMachineCreate, handleMachineDelete } from "./api/machines.js";
 import { handleApiKeyList, handleApiKeyCreate, handleApiKeyRevoke, verifyApiKey } from "./api/apikeys.js";
 import { handleTenantMe } from "./api/tenants.js";
+import { handle2FASetup, handle2FAVerify, handle2FADisable, handle2FAStatus } from "./api/2fa.js";
 import { handleRulesList, handleRuleCreate, handleRuleUpdate, handleRuleDelete } from "./api/rules.js";
 import { requireAuth, requireCSRF, securityHeaders } from "./auth/middleware.js";
 import { LANDING_HTML } from "./web/landing.js";
@@ -124,6 +125,19 @@ export default {
     if (path === "/api/ws" && request.headers.get("Upgrade") === "websocket") {
       const stub = env.TENANT.get(env.TENANT.idFromName(session.tenantId));
       return stub.fetch(request);
+    }
+
+    if (path === "/api/2fa/status" && request.method === "GET") {
+      return securityHeaders(await handle2FAStatus(request, env, session));
+    }
+    if (path === "/api/2fa/setup" && request.method === "POST") {
+      return securityHeaders(await handle2FASetup(request, env, session));
+    }
+    if (path === "/api/2fa/verify" && request.method === "POST") {
+      return securityHeaders(await handle2FAVerify(request, env, session));
+    }
+    if (path === "/api/2fa/disable" && request.method === "POST") {
+      return securityHeaders(await handle2FADisable(request, env, session));
     }
 
     if (path === "/api/kill") return handleKillSwitch(request, env);

@@ -26,6 +26,7 @@ tailwind.config = {
 <header class="border-b border-white/5 px-6 h-14 flex items-center gap-4 flex-shrink-0">
   <a href="/" class="font-mono text-xs tracking-[0.3em] uppercase text-neutral-400 hover:text-neutral-100">Meridian</a>
   <span class="font-mono text-xs text-neutral-500 border border-white/10 rounded px-2 py-1" id="tenant-label">...</span>
+  <button id="2fa-btn" class="text-xs px-3 py-1.5 border border-white/10 rounded-md text-neutral-300 hover:border-white/25 transition">2FA</button>
   <button id="rules-btn" class="ml-auto text-xs px-3 py-1.5 bg-white text-black rounded-md font-medium hover:bg-neutral-200 transition">Rules</button>
   <button id="logout-btn" class="text-xs text-neutral-500 hover:text-red-400 transition">Logout</button>
   <div class="flex items-center gap-2 text-xs text-green-500">
@@ -121,6 +122,16 @@ tailwind.config = {
         <button type="submit" class="flex-1 py-2 bg-white text-black rounded-lg font-medium text-sm hover:bg-neutral-200 transition">Create</button>
       </div>
     </form>
+  </div>
+</div>
+
+<div id="2fa-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  <div class="w-full max-w-md bg-ink-900 border border-white/10 rounded-xl p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold">Two-factor auth</h3>
+      <button id="2fa-close" class="text-neutral-500 hover:text-neutral-200">Close</button>
+    </div>
+    <div id="2fa-body"></div>
   </div>
 </div>
 
@@ -503,6 +514,73 @@ tailwind.config = {
       ws.onclose = () => setTimeout(connectWS, 3000);
       ws.onerror = () => {};
     } catch (e) { console.error(e); }
+  }
+
+  $('2fa-btn').addEventListener('click', () => { $('2fa-modal').classList.remove('hidden'); load2FA(); });
+  $('2fa-close').addEventListener('click', () => $('2fa-modal').classList.add('hidden'));
+
+  async function load2FA() {
+    const body = $('2fa-body');
+    body.innerHTML = '<div class="text-xs text-neutral-600 text-center py-4">Loading...</div>';
+    try {
+      const r = await fetch('/api/2fa/status', { headers: { 'X-CSRF-Token': csrf } });
+      const j = await r.json();
+      if (j.enabled) {
+        body.innerHTML =
+          '<div class="text-sm text-green-400 mb-4">Enabled since ' + new Date(j.verified_at * 1000).toISOString().slice(0,10) + '</div>' +
+          '<div class="space-y-3">' +
+          '<input id="2fa-disable-token" placeholder="6-digit code" class="w-full px-3 py-2 bg-ink-950 border border-white/10 rounded-lg text-sm outline-none focus:border-white/30 font-mono">' +
+          '<button id="2fa-disable" class="w-full py-2 border border-red-500/30 text-red-400 rounded-lg text-sm hover:bg-red-500/10 transition">Disable 2FA</button>' +
+          '</div>';
+        $('2fa-disable').addEventListener('click', async () => {
+          const token = $('2fa-disable-token').value.trim();
+          const rr = await fetch('/api/2fa/disable', {
+            method: 'POST',
+            headers: authHeaders(),
+            body: JSON.stringify({ token }),
+          });
+          const jj = await rr.json();
+          if (!rr.ok) { alert(jj.error || 'Failed'); return; }
+          alert('2FA disabled');
+          load2FA();
+        });
+      } else {
+        body.innerHTML =
+          '<p class="text-sm text-neutral-400 mb-4">Protect your account with TOTP. Scan the QR in Google Authenticator, 1Password, or Authy.</p>' +
+          '<button id="2fa-setup" class="w-full py-2 bg-white text-black rounded-lg font-medium text-sm hover:bg-neutral-200 transition">Start setup</button>';
+        $('2fa-setup').addEventListener('click', async () => {
+          const rr = await fetch('/api/2fa/setup', { method: 'POST', headers: authHeaders() });
+          const jj = await rr.json();
+          if (!rr.ok) { alert(jj.error || 'Failed'); return; }
+          body.innerHTML =
+            '<div class="text-xs text-neutral-500 mb-2">Secret</div>' +
+            '<div class="bg-ink-950 border border-white/10 rounded-lg p-3 font-mono text-xs break-all mb-4">' + jj.secret + '</div>' +
+            '<div class="text-xs text-neutral-500 mb-2">Or copy otpauth URI into your app</div>' +
+            '<div class="bg-ink-950 border border-white/10 rounded-lg p-3 font-mono text-xs break-all mb-4">' + jj.uri + '</div>' +
+            '<div class="text-xs text-neutral-500 mb-2">Enter 6-digit code to confirm</div>' +
+            '<input id="2fa-verify-token" maxlength="6" class="w-full px-3 py-2 bg-ink-950 border border-white/10 rounded-lg text-sm outline-none focus:border-white/30 font-mono mb-3">' +
+            '<button id="2fa-verify" class="w-full py-2 bg-white text-black rounded-lg font-medium text-sm hover:bg-neutral-200 transition">Confirm</button>' +
+            '<div id="2fa-verify-msg" class="text-sm text-center mt-2"></div>';
+          $('2fa-verify').addEventListener('click', async () => {
+            const token = $('2fa-verify-token').value.trim();
+            const rv = await fetch('/api/2fa/verify', {
+              method: 'POST',
+              headers: authHeaders(),
+              body: JSON.stringify({ token }),
+            });
+            const jv = await rv.json();
+            if (!rv.ok) { $('2fa-verify-msg').innerHTML = '<span class="text-red-400">' + (jv.error || 'Failed') + '</span>'; return; }
+            $('2fa-body').innerHTML =
+              '<div class="text-sm text-green-400 mb-3">2FA enabled. Save your recovery codes.</div>' +
+              '<div class="bg-ink-950 border border-white/10 rounded-lg p-3 font-mono text-xs space-y-1">' +
+                jv.recovery_codes.map(c => '<div>' + c + '</div>').join('') +
+              '</div>' +
+              '<button id="2fa-done" class="w-full mt-4 py-2 bg-white text-black rounded-lg font-medium text-sm">Done</button>';
+            $('2fa-done').addEventListener('click', () => $('2fa-modal').classList.add('hidden'));
+          });
+        });
+      }
+    } catch (e) { body.innerHTML = '<div class="text-sm text-red-400">' + e.message + '</div>'; }
   }
 
   (async () => {

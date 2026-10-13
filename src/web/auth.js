@@ -67,6 +67,8 @@ export const LOGIN_HTML = `<!DOCTYPE html>
     <input name="email" type="email" required class="w-full px-3.5 py-2.5 bg-ink-900 border border-white/10 rounded-lg text-sm outline-none focus:border-white/30 transition"></div>
     <div><label class="block text-xs text-neutral-500 mb-1.5">Password</label>
     <input name="password" type="password" required class="w-full px-3.5 py-2.5 bg-ink-900 border border-white/10 rounded-lg text-sm outline-none focus:border-white/30 transition"></div>
+    <div id="totp-field" class="hidden"><label class="block text-xs text-neutral-500 mb-1.5">2FA code <span class="text-neutral-600">(6 digits or recovery)</span></label>
+    <input name="totp" type="text" maxlength="11" autocomplete="one-time-code" class="w-full px-3.5 py-2.5 bg-ink-900 border border-white/10 rounded-lg text-sm outline-none focus:border-white/30 transition font-mono"></div>
     <button type="submit" class="w-full py-2.5 bg-white text-black rounded-lg font-medium text-sm hover:bg-neutral-200 transition disabled:opacity-50">Log in</button>
     <div id="msg" class="text-sm text-center"></div>
   </form>
@@ -89,6 +91,13 @@ f.addEventListener('submit', async (e) => {
       body: JSON.stringify(data)
     });
     const j = await r.json();
+    if (j.requires_2fa) {
+      document.getElementById('totp-field').classList.remove('hidden');
+      msg.innerHTML = '<span class="text-amber-400">Enter your 2FA code</span>';
+      document.querySelector('[name=totp]').focus();
+      btn.disabled = false;
+      return;
+    }
     if (!r.ok) { msg.innerHTML = '<span class="text-red-400">' + (j.error || 'Login failed') + '</span>'; return; }
     sessionStorage.setItem('csrf', j.csrf_token);
     // Check onboarding status
