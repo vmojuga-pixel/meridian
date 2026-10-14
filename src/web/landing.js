@@ -49,7 +49,7 @@ tailwind.config = {
       Deterministic intelligence for <span class="text-neutral-500">legacy industrial systems.</span>
     </h1>
     <p class="text-lg md:text-xl text-neutral-400 max-w-2xl leading-relaxed mb-12">
-      Meridian bridges PLCs, SCADA, and Modbus with modern AI operations — without replacing your existing infrastructure. Runs on Cloudflare Edge. Multi-tenant. Auditable.
+      Meridian bridges Modbus, OPC-UA, and Serial with modern AI operations — without replacing your existing infrastructure. Edge-native. Multi-tenant. Auditable.
     </p>
     <div class="flex flex-wrap items-center gap-4">
       <a href="/signup" class="px-6 py-3.5 rounded-lg bg-white text-black font-medium text-sm hover:bg-neutral-200 transition">Get started free</a>
@@ -73,12 +73,12 @@ tailwind.config = {
       <div class="bg-ink-950 p-8 hover:bg-ink-900 transition">
         <div class="font-mono text-xs text-neutral-600 mb-6">02</div>
         <h3 class="font-semibold mb-2">Edge Gateway</h3>
-        <p class="text-sm text-neutral-500 leading-relaxed">Runs on-premise. Reads PLC via Modbus, OPC-UA, Serial. Store-and-forward when offline.</p>
+        <p class="text-sm text-neutral-500 leading-relaxed">Runs on-premise. Reads industrial equipment via Modbus, OPC-UA, Serial. Store-and-forward when offline.</p>
       </div>
       <div class="bg-ink-950 p-8 hover:bg-ink-900 transition">
         <div class="font-mono text-xs text-neutral-600 mb-6">03</div>
         <h3 class="font-semibold mb-2">Multi-Tenant</h3>
-        <p class="text-sm text-neutral-500 leading-relaxed">One Durable Object per factory. Isolated data, isolated rules, isolated audit trail.</p>
+        <p class="text-sm text-neutral-500 leading-relaxed">Isolated environment per factory. Separate data, rules, and audit trail.</p>
       </div>
       <div class="bg-ink-950 p-8 hover:bg-ink-900 transition">
         <div class="font-mono text-xs text-neutral-600 mb-6">04</div>
@@ -88,7 +88,7 @@ tailwind.config = {
       <div class="bg-ink-950 p-8 hover:bg-ink-900 transition">
         <div class="font-mono text-xs text-neutral-600 mb-6">05</div>
         <h3 class="font-semibold mb-2">Immutable Audit</h3>
-        <p class="text-sm text-neutral-500 leading-relaxed">Every command written to R2. Append-only. Auditor-ready for EU compliance.</p>
+        <p class="text-sm text-neutral-500 leading-relaxed">Every command recorded. Append-only. Auditor-ready for EU compliance.</p>
       </div>
       <div class="bg-ink-950 p-8 hover:bg-ink-900 transition">
         <div class="font-mono text-xs text-neutral-600 mb-6">06</div>
@@ -175,7 +175,6 @@ tailwind.config = {
   <div class="max-w-6xl mx-auto px-6 flex flex-wrap items-center justify-between gap-6 text-sm text-neutral-600">
     <div class="font-mono tracking-widest">MERIDIAN · © 2026</div>
     <div class="flex items-center gap-6">
-      <a href="/meri" class="hover:text-neutral-300 transition">Meri</a>
       <a href="/dashboard" class="hover:text-neutral-300 transition">Dashboard</a>
       <a href="/health" class="hover:text-neutral-300 transition">Status</a>
       <a href="https://github.com/vmojuga-pixel/meridian" class="hover:text-neutral-300 transition">GitHub</a>
